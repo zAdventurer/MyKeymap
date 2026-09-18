@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Table from "@/components/Table.vue";
 import Tip from "@/components/Tip.vue";
+import GitHubSync from "@/components/GitHubSync.vue";
 
 import { storeToRefs } from "pinia";
 import { ref } from "vue";
@@ -367,6 +368,11 @@ function normalizeKeyName(hotkey: string) : string {
                     </v-row>
                   </v-card-text>
                 </v-card>
+              </v-col>
+            </v-row>
+            <v-row>
+              <v-col>
+                <git-hub-sync />
               </v-col>
             </v-row>
         </div>

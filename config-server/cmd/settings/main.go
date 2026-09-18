@@ -17,6 +17,7 @@ import (
 	"settings/internal/command"
 	"settings/internal/matrix"
 	"settings/internal/script"
+	configsync "settings/internal/sync"
 	"text/template"
 	"time"
 )
@@ -68,6 +69,22 @@ func server(hasError chan<- struct{}, rainDone <-chan struct{}, debug bool) {
 	router.PUT("/config", SaveConfigHandler(debug))
 	router.POST("/server/command/:id", ServerCommandHandler)
 	router.GET("/shortcuts", GetShortcutsHandler)
+
+	syncHandler := configsync.NewHTTPHandler(configsync.HTTPConfig{
+		Config: configsync.Config{
+			RepositoryURL: configsync.DefaultRepositoryURL,
+			Branch:        configsync.DefaultBranch,
+			ConfigPath:    filepath.FromSlash("../data/config.json"),
+			MirrorPath:    filepath.FromSlash("../data/.mykeymap-sync/mirror"),
+			StatePath:     filepath.FromSlash("../data/.mykeymap-sync/state.json"),
+			BackupPath:    filepath.FromSlash("../data/.mykeymap-sync/backups"),
+		},
+		SettingsPath: filepath.FromSlash("../data/.mykeymap-sync/settings.json"),
+		Restart: func() error {
+			return execCmd("./MyKeymap.exe")
+		},
+	})
+	syncHandler.Register(router)
 
 	// 先尝试 12333 端口, 失败了则用随机端口. 因为 12333 端口可能已被占用, 或者被禁:
 	// An attempt was made to access a socket in a way forbidden by its access permissions.
@@ -197,7 +214,7 @@ func ServerCommandHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
-func execCmd(exe string, args ...string) {
+func execCmd(exe string, args ...string) error {
 	// 切换到 parent 文件夹, 执行完 command 后再回来
 	// 程序工作目录算全局共享状态, 所以会影响到其他 goroutine
 	wd, err := os.Getwd()
@@ -214,7 +231,9 @@ func execCmd(exe string, args ...string) {
 	var c = exec.Command(exe, args...)
 	err = c.Start()
 	if err != nil {
+		return err
 	}
+	return nil
 }
 
 func SaveConfigHandler(debug bool) gin.HandlerFunc {
