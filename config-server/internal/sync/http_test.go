@@ -293,6 +293,31 @@ func TestRedactSensitiveDiffRedactsSensitiveJSONOnContextLines(t *testing.T) {
 	}
 }
 
+func TestAbsolutePathResolvesServerRelativeConfigurationPath(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin")
+	if err := os.MkdirAll(bin, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	previousDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(bin); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previousDirectory) })
+
+	path, err := absolutePath(filepath.FromSlash("../data/config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "data", "config.json")
+	if path != want {
+		t.Fatalf("absolutePath() = %q, want %q", path, want)
+	}
+}
+
 func TestHTTPPullReturnsFailureWhenRestartFails(t *testing.T) {
 	repository, config := newRepositoryTestFixture(t, `{"name":"initial"}`)
 	if err := repository.Push(context.Background()); err != nil {

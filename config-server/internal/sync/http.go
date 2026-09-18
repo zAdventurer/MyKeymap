@@ -159,8 +159,18 @@ func (handler *HTTPHandler) diff(c *gin.Context) {
 		return
 	}
 
+	localPath, err := absolutePath(repository.Config.ConfigPath)
+	if err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	remotePath, err := absolutePath(repository.mirrorConfigPath())
+	if err != nil {
+		writeSyncError(c, err)
+		return
+	}
 	command := repository.Git.Command(c.Request.Context(), repository.Config.MirrorPath,
-		"diff", "--no-index", "--", repository.Config.ConfigPath, repository.mirrorConfigPath())
+		"diff", "--no-index", "--", localPath, remotePath)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		var exitError *exec.ExitError
@@ -300,6 +310,10 @@ func writeSettingsAtomically(path string, settings SyncSettings) (err error) {
 		return err
 	}
 	return replaceFileAtomically(temporaryPath, path)
+}
+
+func absolutePath(path string) (string, error) {
+	return filepath.Abs(path)
 }
 
 func redactSensitiveDiff(diff string) string {
