@@ -293,6 +293,21 @@ func TestRedactSensitiveDiffRedactsSensitiveJSONOnContextLines(t *testing.T) {
 	}
 }
 
+func TestRedactConfigJSONSupportsFormattedConfiguration(t *testing.T) {
+	input := []byte("{\n  \"name\": \"local\",\n  \"nested\": {\n    \"apiKey\": \"very-secret\"\n  }\n}\n")
+
+	redacted, err := redactConfigJSON(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(redacted), "very-secret") {
+		t.Fatalf("redacted configuration exposed a secret: %s", redacted)
+	}
+	if !strings.Contains(string(redacted), `"name": "local"`) || !strings.Contains(string(redacted), `"apiKey": "[REDACTED]"`) {
+		t.Fatalf("redacted configuration did not preserve safe values: %s", redacted)
+	}
+}
+
 func TestAbsolutePathResolvesServerRelativeConfigurationPath(t *testing.T) {
 	root := t.TempDir()
 	bin := filepath.Join(root, "bin")

@@ -169,8 +169,34 @@ func (handler *HTTPHandler) diff(c *gin.Context) {
 		writeSyncError(c, err)
 		return
 	}
-	command := repository.Git.Command(c.Request.Context(), repository.Config.MirrorPath,
-		"diff", "--no-index", "--", localPath, remotePath)
+	localConfig, err := readRedactedConfig(localPath)
+	if err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	remoteConfig, err := readRedactedConfig(remotePath)
+	if err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	diffDirectory, err := os.MkdirTemp("", "mykeymap-sync-diff-")
+	if err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	defer os.RemoveAll(diffDirectory)
+	localDiffPath := filepath.Join(diffDirectory, "local-config.json")
+	remoteDiffPath := filepath.Join(diffDirectory, "remote-config.json")
+	if err := os.WriteFile(localDiffPath, localConfig, 0o600); err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	if err := os.WriteFile(remoteDiffPath, remoteConfig, 0o600); err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	command := repository.Git.Command(c.Request.Context(), diffDirectory,
+		"diff", "--no-index", "--", localDiffPath, remoteDiffPath)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		var exitError *exec.ExitError
@@ -314,6 +340,27 @@ func writeSettingsAtomically(path string, settings SyncSettings) (err error) {
 
 func absolutePath(path string) (string, error) {
 	return filepath.Abs(path)
+}
+
+func readRedactedConfig(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return redactConfigJSON(data)
+}
+
+func redactConfigJSON(data []byte) ([]byte, error) {
+	var value any
+	if err := json.Unmarshal(data, &value); err != nil {
+		return nil, err
+	}
+	redactJSONValue(value)
+	redacted, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(redacted, '\n'), nil
 }
 
 func redactSensitiveDiff(diff string) string {
