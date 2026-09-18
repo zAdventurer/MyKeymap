@@ -16,12 +16,12 @@ const isBusy = computed(() => operation.value !== null)
 const isConflict = computed(() => status.value === 'conflict')
 const statusText = computed(() => {
   const labels: Record<SyncStatus, string> = {
-    synchronized: 'Synchronized',
-    'local-only': 'Local changes waiting to be pushed',
-    'remote-only': 'Remote changes waiting to be pulled',
-    conflict: 'Conflict: both local and remote settings changed',
+    synchronized: '已同步',
+    'local-only': '本地配置有更新，等待推送',
+    'remote-only': '远端配置有更新，等待拉取',
+    conflict: '存在冲突：本地和远端均已修改',
   }
-  return status.value ? labels[status.value] : 'Status unavailable'
+  return status.value ? labels[status.value] : '状态不可用'
 })
 const statusColor = computed(() => {
   if (status.value === 'conflict') return 'error'
@@ -38,22 +38,15 @@ function readableError(value: unknown) {
     if (typeof error.message === 'string') return error.message
   }
 
-  return 'The sync service could not be reached. Check that MyKeymap is running, then try again.'
+  return '无法连接同步服务。请确认 MyKeymap 正在运行后重试。'
 }
 
-async function request<T>(operationName: Exclude<SyncOperation, null>, action: () => PromiseLike<{ data: { value: T | null }, error: { value: unknown } }>) {
+async function request<T>(operationName: Exclude<SyncOperation, null>, action: () => Promise<T>) {
   operation.value = operationName
   errorMessage.value = ''
 
   try {
-    const response = await action()
-    if (response.error.value) {
-      throw response.error.value
-    }
-    if (!response.data.value) {
-      throw new Error('No response was received from the sync service.')
-    }
-    return response.data.value
+    return await action()
   } catch (error) {
     errorMessage.value = readableError(error)
     return null
@@ -110,14 +103,14 @@ onMounted(refreshStatus)
 </script>
 
 <template>
-  <v-card title="GitHub sync" min-width="350" elevation="2">
+  <v-card title="GitHub 配置同步" min-width="350" elevation="2">
     <v-card-text>
       <v-alert v-if="errorMessage" class="mb-4" density="compact" type="error" variant="tonal" closable @click:close="errorMessage = ''">
         {{ errorMessage }}
       </v-alert>
 
-      <v-text-field v-model="repositoryUrl" label="Repository" variant="underlined" :disabled="isBusy" />
-      <v-text-field v-model="branch" label="Branch" variant="underlined" :disabled="isBusy" />
+      <v-text-field v-model="repositoryUrl" label="仓库地址" variant="underlined" :disabled="isBusy" />
+      <v-text-field v-model="branch" label="分支" variant="underlined" :disabled="isBusy" />
 
       <div class="d-flex align-center flex-wrap ga-2 mb-3">
         <v-chip :color="statusColor" label size="small">
@@ -127,30 +120,30 @@ onMounted(refreshStatus)
       </div>
 
       <div class="d-flex flex-wrap ga-2">
-        <v-btn class="text-none" color="primary" variant="outlined" :disabled="isBusy" @click="saveSettings">Save repository</v-btn>
-        <v-btn class="text-none" color="blue" variant="outlined" :disabled="isBusy" @click="runAction('pull')">Pull</v-btn>
-        <v-btn class="text-none" color="green" variant="outlined" :disabled="isBusy" @click="runAction('push')">Push</v-btn>
-        <v-btn class="text-none" variant="outlined" :disabled="isBusy" @click="viewDiff">View diff</v-btn>
-        <v-btn icon="mdi-refresh" variant="text" :disabled="isBusy" aria-label="Refresh sync status" @click="refreshStatus" />
+        <v-btn class="text-none" color="primary" variant="outlined" :disabled="isBusy" @click="saveSettings">保存仓库</v-btn>
+        <v-btn class="text-none" color="blue" variant="outlined" :disabled="isBusy" @click="runAction('pull')">拉取</v-btn>
+        <v-btn class="text-none" color="green" variant="outlined" :disabled="isBusy" @click="runAction('push')">推送</v-btn>
+        <v-btn class="text-none" variant="outlined" :disabled="isBusy" @click="viewDiff">查看差异</v-btn>
+        <v-btn icon="mdi-refresh" variant="text" :disabled="isBusy" aria-label="刷新同步状态" @click="refreshStatus" />
       </div>
 
       <v-alert v-if="isConflict" class="mt-4" density="compact" type="warning" variant="tonal">
-        Local and remote settings both changed. Choose which version to keep; the other copy is backed up by MyKeymap.
+        本地与远端配置都已修改。请选择保留哪个版本；另一个版本会由 MyKeymap 自动备份。
         <div class="d-flex flex-wrap ga-2 mt-3">
-          <v-btn class="text-none" color="primary" variant="outlined" :disabled="isBusy" @click="resolveConflict('keep-local')">Keep local</v-btn>
-          <v-btn class="text-none" color="warning" variant="outlined" :disabled="isBusy" @click="resolveConflict('use-remote')">Use remote</v-btn>
+          <v-btn class="text-none" color="primary" variant="outlined" :disabled="isBusy" @click="resolveConflict('keep-local')">保留本地</v-btn>
+          <v-btn class="text-none" color="warning" variant="outlined" :disabled="isBusy" @click="resolveConflict('use-remote')">使用远端</v-btn>
         </div>
       </v-alert>
     </v-card-text>
   </v-card>
 
   <v-dialog v-model="showDiff" max-width="900">
-    <v-card title="Configuration differences">
+    <v-card title="配置差异">
       <v-card-text>
         <pre class="sync-diff">{{ diff }}</pre>
       </v-card-text>
       <v-card-actions class="justify-end">
-        <v-btn class="text-none" color="primary" @click="showDiff = false">Close</v-btn>
+        <v-btn class="text-none" color="primary" @click="showDiff = false">关闭</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
