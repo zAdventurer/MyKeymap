@@ -24,9 +24,20 @@ export interface SyncActionResponse {
   status: SyncStatus
 }
 
+export type SyncDifferenceKind = 'added' | 'removed' | 'modified'
+
+export interface SyncDifference {
+  group: '快捷键映射' | 'CapsLock 缩写' | '普通设置' | '其他' | string
+  path: string
+  kind: SyncDifferenceKind
+  local: string
+  remote: string
+}
+
 export interface SyncDiffResponse {
   status: SyncStatus
-  diff: string
+  differences: SyncDifference[]
+  rawDiff: string
 }
 
 async function syncRequest<T>(path: string, init?: RequestInit): Promise<T> {

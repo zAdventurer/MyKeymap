@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { server, type SyncStatus, type SyncStatusResponse } from '@/store/server'
+import { server, type SyncDifference, type SyncStatus, type SyncStatusResponse } from '@/store/server'
 
 type SyncOperation = 'loading' | 'saving' | 'pulling' | 'pushing' | 'diffing' | 'resolving' | null
 
@@ -9,7 +9,10 @@ const repositoryUrl = ref('')
 const branch = ref('')
 const operation = ref<SyncOperation>(null)
 const errorMessage = ref('')
-const diff = ref('')
+const differences = ref<SyncDifference[]>([])
+const rawDiff = ref('')
+const rawPanel = ref<string>()
+const copyMessage = ref('')
 const showDiff = ref(false)
 
 const isBusy = computed(() => operation.value !== null)
@@ -28,6 +31,20 @@ const statusColor = computed(() => {
   if (status.value === 'synchronized') return 'success'
   return 'warning'
 })
+const groupedDifferences = computed(() => {
+  const groups = new Map<string, SyncDifference[]>()
+  for (const difference of differences.value) {
+    const items = groups.get(difference.group) ?? []
+    items.push(difference)
+    groups.set(difference.group, items)
+  }
+  return Array.from(groups, ([name, items]) => ({ name, items }))
+})
+const kindPresentation: Record<SyncDifference['kind'], { label: string, color: string }> = {
+  added: { label: '新增', color: 'success' },
+  removed: { label: '删除', color: 'error' },
+  modified: { label: '修改', color: 'warning' },
+}
 
 function readableError(value: unknown) {
   if (typeof value === 'string' && value.trim()) return value
@@ -88,8 +105,20 @@ async function viewDiff() {
   const response = await request('diffing', () => server.getSyncDiff())
   if (response) {
     status.value = response.status
-    diff.value = response.diff || 'No textual differences are available.'
+    differences.value = response.differences ?? []
+    rawDiff.value = response.rawDiff ?? ''
+    rawPanel.value = undefined
+    copyMessage.value = ''
     showDiff.value = true
+  }
+}
+
+async function copyRawDiff() {
+  try {
+    await navigator.clipboard.writeText(rawDiff.value)
+    copyMessage.value = '已复制'
+  } catch {
+    copyMessage.value = '复制失败，请手动选择文本'
   }
 }
 
@@ -137,10 +166,48 @@ onMounted(refreshStatus)
     </v-card-text>
   </v-card>
 
-  <v-dialog v-model="showDiff" max-width="900">
+  <v-dialog v-model="showDiff" max-width="1100">
     <v-card title="配置差异">
-      <v-card-text>
-        <pre class="sync-diff">{{ diff }}</pre>
+      <v-card-text class="diff-dialog-body">
+        <v-alert v-if="differences.length === 0" type="info" variant="tonal">
+          本地与远端没有可显示的配置差异。
+        </v-alert>
+
+        <section v-for="group in groupedDifferences" :key="group.name" class="mb-6">
+          <h3 class="text-h6 mb-3">{{ group.name }}</h3>
+          <v-card v-for="item in group.items" :key="`${item.path}:${item.kind}`" class="mb-3" variant="outlined">
+            <v-card-title class="d-flex align-center flex-wrap ga-2 text-subtitle-1">
+              <span>{{ item.path }}</span>
+              <v-chip :color="kindPresentation[item.kind].color" size="small" label>
+                {{ kindPresentation[item.kind].label }}
+              </v-chip>
+            </v-card-title>
+            <v-card-text>
+              <v-row>
+                <v-col cols="12" md="6">
+                  <div class="text-caption text-medium-emphasis mb-1">本地</div>
+                  <div class="semantic-value">{{ item.local }}</div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="text-caption text-medium-emphasis mb-1">远端</div>
+                  <div class="semantic-value">{{ item.remote }}</div>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+        </section>
+
+        <v-expansion-panels v-if="rawDiff" v-model="rawPanel" class="mt-4">
+          <v-expansion-panel value="raw" title="高级：原始 JSON 差异">
+            <v-expansion-panel-text>
+              <div class="d-flex align-center ga-2 mb-2">
+                <v-btn class="text-none" size="small" variant="outlined" @click="copyRawDiff">复制</v-btn>
+                <span class="text-caption">{{ copyMessage }}</span>
+              </div>
+              <pre class="sync-diff">{{ rawDiff }}</pre>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
       </v-card-text>
       <v-card-actions class="justify-end">
         <v-btn class="text-none" color="primary" @click="showDiff = false">关闭</v-btn>
@@ -150,8 +217,18 @@ onMounted(refreshStatus)
 </template>
 
 <style scoped>
+.diff-dialog-body {
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.semantic-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .sync-diff {
-  max-height: 55vh;
+  max-height: 45vh;
   overflow: auto;
   padding: 12px;
   white-space: pre-wrap;
