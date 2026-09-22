@@ -154,11 +154,6 @@ func (handler *HTTPHandler) diff(c *gin.Context) {
 		writeSyncError(c, err)
 		return
 	}
-	if status == StatusLocalOnly {
-		c.JSON(http.StatusOK, gin.H{"status": status, "diff": ""})
-		return
-	}
-
 	localPath, err := absolutePath(repository.Config.ConfigPath)
 	if err != nil {
 		writeSyncError(c, err)
@@ -175,6 +170,11 @@ func (handler *HTTPHandler) diff(c *gin.Context) {
 		return
 	}
 	remoteConfig, err := readRedactedConfig(remotePath)
+	if err != nil {
+		writeSyncError(c, err)
+		return
+	}
+	differences, err := BuildSemanticDiff(localConfig, remoteConfig)
 	if err != nil {
 		writeSyncError(c, err)
 		return
@@ -208,7 +208,11 @@ func (handler *HTTPHandler) diff(c *gin.Context) {
 	// Both temporary files were parsed and redacted before Git generated this
 	// diff, so applying the line-oriented fallback here would reject valid
 	// formatted JSON lines and hide otherwise safe differences.
-	c.JSON(http.StatusOK, gin.H{"status": status, "diff": string(output)})
+	c.JSON(http.StatusOK, gin.H{
+		"status":      status,
+		"differences": differences,
+		"rawDiff":     string(output),
+	})
 }
 
 func (handler *HTTPHandler) resolve(c *gin.Context) {

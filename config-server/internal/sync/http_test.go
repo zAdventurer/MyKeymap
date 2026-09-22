@@ -206,14 +206,11 @@ func TestHTTPPushReturnsStructuredConflictWithoutOverwritingEitherCopy(t *testin
 }
 
 func TestHTTPDiffRedactsSensitiveConfigurationValues(t *testing.T) {
-	repository, config := newRepositoryTestFixture(t, `{"token":"local-secret"}`)
+	repository, config := newRepositoryTestFixture(t, `{"keymaps":[],"options":{"name":"local","api_key":"local-api-key","privateKey":"local-private-key","cookie":"local-cookie"}}`)
 	if err := repository.Push(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(config.ConfigPath, []byte(`{"token":"local-secret"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	writeRemoteRepositoryConfig(t, config.RepositoryURL, config.Branch, `{"token":"remote-secret"}`)
+	writeRemoteRepositoryConfig(t, config.RepositoryURL, config.Branch, `{"keymaps":[],"options":{"name":"remote","api_key":"remote-api-key","privateKey":"remote-private-key","cookie":"remote-cookie"}}`)
 	handler := NewHTTPHandler(HTTPConfig{Config: config, SettingsPath: filepath.Join(t.TempDir(), "settings.json")})
 	router := newHTTPRouter(handler)
 
@@ -221,11 +218,21 @@ func TestHTTPDiffRedactsSensitiveConfigurationValues(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("GET /sync/diff status = %d, body = %s", response.Code, response.Body.String())
 	}
-	if strings.Contains(response.Body.String(), "local-secret") || strings.Contains(response.Body.String(), "remote-secret") {
-		t.Fatalf("diff exposed a sensitive value: %s", response.Body.String())
+	for _, secret := range []string{"local-api-key", "remote-api-key", "local-private-key", "remote-private-key", "local-cookie", "remote-cookie"} {
+		if strings.Contains(response.Body.String(), secret) {
+			t.Fatalf("diff exposed %q: %s", secret, response.Body.String())
+		}
 	}
-	if strings.Contains(response.Body.String(), "configuration diff contains malformed JSON") {
-		t.Fatalf("diff rejected valid formatted configuration: %s", response.Body.String())
+	var body struct {
+		Differences []SemanticDifference `json:"differences"`
+		RawDiff     string               `json:"rawDiff"`
+	}
+	decodeHTTPResponse(t, response, &body)
+	if len(body.Differences) != 1 || body.Differences[0].Path != "name" {
+		t.Fatalf("differences = %#v, want the safe name change only", body.Differences)
+	}
+	if !strings.Contains(body.RawDiff, "[REDACTED]") {
+		t.Fatalf("rawDiff did not include redaction markers: %s", body.RawDiff)
 	}
 }
 
@@ -243,14 +250,45 @@ func TestHTTPDiffReturnsFormattedNonSensitiveChanges(t *testing.T) {
 		t.Fatalf("GET /sync/diff status = %d, body = %s", response.Code, response.Body.String())
 	}
 	var body struct {
-		Diff string `json:"diff"`
+		Status      Status               `json:"status"`
+		Differences []SemanticDifference `json:"differences"`
+		RawDiff     string               `json:"rawDiff"`
 	}
 	decodeHTTPResponse(t, response, &body)
-	if strings.Contains(body.Diff, "configuration diff contains malformed JSON") || body.Diff == "" {
-		t.Fatalf("diff = %q, want rendered non-sensitive change", body.Diff)
+	if len(body.Differences) != 1 {
+		t.Fatalf("differences = %#v, want one semantic change", body.Differences)
 	}
-	if !strings.Contains(body.Diff, `"local"`) || !strings.Contains(body.Diff, `"remote"`) {
-		t.Fatalf("diff did not include the non-sensitive change: %s", body.Diff)
+	if body.Differences[0].Group != "其他" || body.Differences[0].Path != "name" || body.Differences[0].Local != `"local"` || body.Differences[0].Remote != `"remote"` {
+		t.Fatalf("semantic difference = %#v", body.Differences[0])
+	}
+	if !strings.Contains(body.RawDiff, `"local"`) || !strings.Contains(body.RawDiff, `"remote"`) {
+		t.Fatalf("rawDiff did not include the non-sensitive change: %s", body.RawDiff)
+	}
+}
+
+func TestHTTPDiffFailsSafelyForMalformedConfiguration(t *testing.T) {
+	repository, config := newRepositoryTestFixture(t, `{"keymaps":`)
+	if err := repository.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	writeRemoteRepositoryConfig(t, config.RepositoryURL, config.Branch, `{"keymaps":[],"options":{}}`)
+	handler := NewHTTPHandler(HTTPConfig{Config: config, SettingsPath: filepath.Join(t.TempDir(), "settings.json")})
+
+	response := performHTTPRequest(t, newHTTPRouter(handler), http.MethodGet, "/sync/diff", nil)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /sync/diff status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), `{"keymaps":`) {
+		t.Fatalf("malformed configuration leaked in response: %s", response.Body.String())
+	}
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	decodeHTTPResponse(t, response, &body)
+	if body.Error.Code != "sync_failed" {
+		t.Fatalf("error code = %q, want sync_failed", body.Error.Code)
 	}
 }
 
