@@ -224,6 +224,34 @@ func TestHTTPDiffRedactsSensitiveConfigurationValues(t *testing.T) {
 	if strings.Contains(response.Body.String(), "local-secret") || strings.Contains(response.Body.String(), "remote-secret") {
 		t.Fatalf("diff exposed a sensitive value: %s", response.Body.String())
 	}
+	if strings.Contains(response.Body.String(), "configuration diff contains malformed JSON") {
+		t.Fatalf("diff rejected valid formatted configuration: %s", response.Body.String())
+	}
+}
+
+func TestHTTPDiffReturnsFormattedNonSensitiveChanges(t *testing.T) {
+	repository, config := newRepositoryTestFixture(t, `{"name":"local"}`)
+	if err := repository.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	writeRemoteRepositoryConfig(t, config.RepositoryURL, config.Branch, `{"name":"remote"}`)
+	handler := NewHTTPHandler(HTTPConfig{Config: config, SettingsPath: filepath.Join(t.TempDir(), "settings.json")})
+	router := newHTTPRouter(handler)
+
+	response := performHTTPRequest(t, router, http.MethodGet, "/sync/diff", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("GET /sync/diff status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Diff string `json:"diff"`
+	}
+	decodeHTTPResponse(t, response, &body)
+	if strings.Contains(body.Diff, "configuration diff contains malformed JSON") || body.Diff == "" {
+		t.Fatalf("diff = %q, want rendered non-sensitive change", body.Diff)
+	}
+	if !strings.Contains(body.Diff, `"local"`) || !strings.Contains(body.Diff, `"remote"`) {
+		t.Fatalf("diff did not include the non-sensitive change: %s", body.Diff)
+	}
 }
 
 func TestRedactSensitiveDiffRecursivelyRedactsParsedJSON(t *testing.T) {

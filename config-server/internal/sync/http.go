@@ -205,7 +205,10 @@ func (handler *HTTPHandler) diff(c *gin.Context) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"status": status, "diff": redactSensitiveDiff(string(output))})
+	// Both temporary files were parsed and redacted before Git generated this
+	// diff, so applying the line-oriented fallback here would reject valid
+	// formatted JSON lines and hide otherwise safe differences.
+	c.JSON(http.StatusOK, gin.H{"status": status, "diff": string(output)})
 }
 
 func (handler *HTTPHandler) resolve(c *gin.Context) {
