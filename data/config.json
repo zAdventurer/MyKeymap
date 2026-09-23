@@ -262,7 +262,7 @@
     {
       "id": 6,
       "name": "CapsLock + F",
-      "enable": true,
+      "enable": false,
       "hotkey": "*f",
       "parentID": 5,
       "delay": 0,
@@ -344,8 +344,8 @@
           {
             "windowGroupID": 0,
             "actionTypeID": 8,
-            "comment": "如果 QQ.exe 进程存在则输入 Ctrl+Alt+Z 热键激活 QQ，否则启动 QQ",
-            "ahkCode": "ProcessExistSendKeyOrRun(\"QQ.exe\", \"^!z\", \"shortcuts\\QQ.lnk\")"
+            "comment": "如果 TIM.exe 进程存在则输入 Ctrl+Alt+Z 热键激活 TIM，否则启动 TIM",
+            "ahkCode": "ProcessExistSendKeyOrRun(\"TIM.exe\", \"^!z\", \"shortcuts\\TIM.lnk\")"
           }
         ],
         "*n": [
@@ -424,7 +424,7 @@
     {
       "id": 7,
       "name": "CapsLock + Space",
-      "enable": true,
+      "enable": false,
       "hotkey": "*Space",
       "parentID": 5,
       "delay": 0,
@@ -460,7 +460,7 @@
     {
       "id": 8,
       "name": "J 模式",
-      "enable": true,
+      "enable": false,
       "hotkey": "*j",
       "parentID": 0,
       "delay": 0,
@@ -837,7 +837,7 @@
       "enable": true,
       "hotkey": "*3",
       "parentID": 0,
-      "delay": 0,
+      "delay": 150,
       "disableAt": "",
       "hotkeys": {
         "*/": [
@@ -846,14 +846,6 @@
             "actionTypeID": 9,
             "comment": "label:78",
             "actionValueID": 8
-          }
-        ],
-        "*0": [
-          {
-            "windowGroupID": 0,
-            "actionTypeID": 5,
-            "comment": "Remap to F10",
-            "remapToKey": "F10"
           }
         ],
         "*2": [
@@ -878,14 +870,6 @@
             "actionTypeID": 5,
             "comment": "Remap to F5",
             "remapToKey": "F5"
-          }
-        ],
-        "*9": [
-          {
-            "windowGroupID": 0,
-            "actionTypeID": 5,
-            "comment": "Remap to F9",
-            "remapToKey": "F9"
           }
         ],
         "*b": [
@@ -1211,10 +1195,10 @@
     {
       "id": 13,
       "name": "分号模式( ; )",
-      "enable": true,
+      "enable": false,
       "hotkey": "*;",
       "parentID": 0,
-      "delay": 0,
+      "delay": 50,
       "disableAt": "",
       "hotkeys": {
         "*a": [
@@ -1409,7 +1393,7 @@
       "enable": true,
       "hotkey": "*.",
       "parentID": 0,
-      "delay": 0,
+      "delay": 100,
       "disableAt": "",
       "hotkeys": {
         "*,": [
@@ -1569,7 +1553,7 @@
     {
       "id": 16,
       "name": "鼠标右键",
-      "enable": true,
+      "enable": false,
       "hotkey": "RButton",
       "parentID": 0,
       "delay": 0,
@@ -1847,6 +1831,16 @@
             "target": "https://www.google.com/search?q={selected}"
           }
         ],
+        "gb": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "comment": "打开 Git Bash（用户主目录）",
+            "winTitle": "ahk_exe mintty.exe",
+            "target": "C:\\Program Files\\Git\\git-bash.exe",
+            "args": "--cd-to-home"
+          }
+        ],
         "gj": [
           {
             "windowGroupID": 0,
@@ -1932,6 +1926,15 @@
             "actionValueID": 10
           }
         ],
+        "pw": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "comment": "powershell",
+            "winTitle": "ahk_exe WindowsTerminal.exe",
+            "target": "powershell.exe"
+          }
+        ],
         "rb": [
           {
             "windowGroupID": 0,
@@ -1946,6 +1949,14 @@
             "actionTypeID": 2,
             "comment": "label:23",
             "actionValueID": 7
+          }
+        ],
+        "rw": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "comment": "任务管理器",
+            "winTitle": "ahk_exe Taskmgr.exe"
           }
         ],
         "se": [
@@ -1990,6 +2001,15 @@
             "keysToSend": "^+{esc}"
           }
         ],
+        "ty": [
+          {
+            "windowGroupID": 0,
+            "actionTypeID": 1,
+            "comment": "Typora",
+            "winTitle": "ahk_exe Typora.exe",
+            "target": "shortcuts\\Typora.lnk"
+          }
+        ],
         "vm": [
           {
             "windowGroupID": 0,
@@ -2029,7 +2049,7 @@
     {
       "id": 3,
       "name": "Abbreviation",
-      "enable": true,
+      "enable": false,
       "hotkey": "semicolonAbbr",
       "parentID": 0,
       "delay": 0,
@@ -2197,7 +2217,6 @@
     }
   ],
   "options": {
-    "hideMatrix": false,
     "mykeymapVersion": "2.0-beta33",
     "windowGroups": [
       {
@@ -2264,8 +2283,8 @@
         "value": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\"
       }
     ],
-    "startup": false,
-    "language": "",
+    "startup": true,
+    "language": "zh",
     "keyMapping": "",
     "keyboardLayout": "1 2 3 4 5 6 7 8 9 0\nq w e r t y u i o p\na s d f g h j k l ;\nz x c v b n m , . /\nspace enter backspace - [ ' singlePress"
   }
